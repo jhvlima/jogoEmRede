@@ -25,12 +25,15 @@ python3 start_client_server.py
 ```
 
 ### Test the game:
-1. Open browser to `http://localhost:8000`
+1. Open browser to one of these clients:
+   - **Visual Game**: `http://localhost:8000/game.html` (Recommended - includes animations!)
+   - **Simple Client**: `http://localhost:8000/index.html` (Basic interface)
 2. Open a second browser window/tab to the same URL
 3. First player will see "Aguardando oponente..."
 4. Second player joining will start the game
-5. Take turns entering angle (0-90°) and force (0-100)
-6. Watch health bars decrease with each successful hit!
+5. **Visual Interface**: Click and drag to aim, release to fire automatically
+6. **Simple Interface**: Use sliders to set angle (0-90°) and force (0-100), then click fire
+7. Watch health bars decrease and see projectile animations with each hit!
 
 ## 3. Understanding the Game
 
@@ -43,9 +46,10 @@ python3 start_client_server.py
 - **Win condition**: Reduce opponent's health to 0
 
 ### Controls:
-- **Angle**: 0-90 degrees (optimal around 42-45°)
-- **Force**: 0-100 power (higher = further range)
+- **Visual Client**: Click and drag from anywhere on canvas to aim, release mouse to fire
+- **Simple Client**: Use angle slider (0-90°) and force slider (0-100%), then click fire button
 - **Physics**: Realistic projectile motion with accuracy-based hit detection
+- **Optimal shots**: ~42-45° angle with 80-85% force for consistent hits
 
 ### Tips for Good Shots:
 - Try angle 42-45° with force 80-85 for consistent body hits

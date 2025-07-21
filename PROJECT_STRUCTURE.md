@@ -19,7 +19,8 @@ workspace/
 │   ├── handler.py             # Move processing & validation
 │   └── utils.py               # Physics calculations & damage system
 ├── client/                    # Client-side interface
-│   └── index.html             # HTML client for manual testing
+│   ├── index.html             # Simple HTML client for testing
+│   └── game.html              # Enhanced visual client with animations
 ├── test_server.py             # Comprehensive automated test suite
 ├── start_client_server.py     # HTTP server for serving client files
 ├── requirements.txt           # Python dependencies
@@ -65,14 +66,22 @@ workspace/
 
 ### 2. Client Components (`/client/`)
 
-#### `index.html` - Interactive Test Client
-- **Responsibilities**: User interface, server communication, game visualization
+#### `index.html` - Simple Test Client
+- **Responsibilities**: Basic user interface, server communication
 - **Key Features**:
   - Real-time connection status
   - Turn-based move input (angle/force sliders)
   - Health bar visualization
   - Message logging and error display
-  - Responsive design for different screen sizes
+
+#### `game.html` - Enhanced Visual Client
+- **Responsibilities**: Advanced user interface with animations
+- **Key Features**:
+  - Interactive canvas with drag-to-aim controls
+  - Real-time projectile animation with physics
+  - Visual player models and battlefield
+  - Trajectory preview and aiming assistance
+  - Smooth health animations and visual feedback
 
 ### 3. Testing & Development Tools
 
