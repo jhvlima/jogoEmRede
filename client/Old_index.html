@@ -260,13 +260,11 @@
             const canMove = connected && gameStarted && currentTurn === playerId;
             moveBtn.disabled = !canMove;
             
-            console.log(`Turn update: currentTurn=${currentTurn}, playerId=${playerId}, canMove=${canMove}`);
-            
             if (canMove) {
                 moveBtn.textContent = 'Fazer Jogada - SUA VEZ!';
                 moveBtn.style.backgroundColor = '#28a745';
             } else if (gameStarted && currentTurn !== playerId) {
-                moveBtn.textContent = `Aguardando Jogador ${currentTurn}...`;
+                moveBtn.textContent = 'Aguardando turno do oponente...';
                 moveBtn.style.backgroundColor = '#6c757d';
             } else {
                 moveBtn.textContent = 'Aguardando jogo iniciar...';
@@ -331,6 +329,7 @@
                     break;
                     
                 case 'inicio':
+                    playerId = data.jogador_id;
                     gameStarted = true;
                     currentTurn = data.turno_atual;
                     document.getElementById('gameControls').classList.add('active');
@@ -342,10 +341,7 @@
                     
                 case 'atualizacao':
                     updateHealth(data.vidas[1], data.vidas[2]);
-                    if (data.turno_atual !== undefined) {
-                        currentTurn = data.turno_atual;
-                        console.log(`Turn updated to: ${currentTurn}`);
-                    }
+                    currentTurn = data.turno_atual;
                     updateMoveButton();
                     addMessage(data.mensagem, 'game');
                     

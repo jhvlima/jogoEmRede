@@ -58,13 +58,23 @@ class GameServer:
                 game.add_player(2, websocket)
                 self.connected_clients[websocket] = player_info
                 
-                # Notify both players that game is starting
-                await self.broadcast_to_game(game_id, {
+                # Notify both players that game is starting with their player ID
+                start_message = {
                     "tipo": "inicio",
                     "mensagem": "Jogo iniciado! Jogador 1 começa.",
                     "turno_atual": game.turno,
                     "vidas": game.vidas
-                })
+                }
+
+                # Send to player 1
+                p1_message = start_message.copy()
+                p1_message['jogador_id'] = 1
+                await game.players[1].send(json.dumps(p1_message))
+                
+                # Send to player 2
+                p2_message = start_message.copy()
+                p2_message['jogador_id'] = 2
+                await game.players[2].send(json.dumps(p2_message))
             
             # Listen for messages
             async for message in websocket:
@@ -106,7 +116,8 @@ class GameServer:
                     "mensagem": f"Jogador {winner} venceu!"
                 })
                 # Clean up the game
-                del self.games[game_id]
+                if game_id in self.games:
+                    del self.games[game_id]
                 
         except Exception as e:
             logger.error(f"Error processing message: {e}")
@@ -122,7 +133,7 @@ class GameServer:
         game = self.games[game_id]
         message_json = json.dumps(message) if isinstance(message, dict) else message
         
-        for player_id, websocket in game.players.items():
+        for player_id, websocket in list(game.players.items()):
             try:
                 await websocket.send(message_json)
             except websockets.ConnectionClosed:
@@ -130,7 +141,7 @@ class GameServer:
     
     async def cleanup_client(self, websocket):
         if websocket in self.connected_clients:
-            player_info = self.connected_clients[websocket]
+            player_info = self.connected_clients.pop(websocket)
             game_id = player_info['game_id']
             
             # Remove from waiting players if still waiting
@@ -139,24 +150,28 @@ class GameServer:
             # Handle game cleanup
             if game_id in self.games:
                 game = self.games[game_id]
-                if len(game.players) == 1:
-                    # Only one player left, end the game
-                    remaining_player = None
-                    for pid, ws in game.players.items():
-                        if ws != websocket:
-                            remaining_player = pid
-                            break
-                    
-                    if remaining_player:
+                
+                # Remove the disconnected player
+                disconnected_player_id = player_info['player_id']
+                if disconnected_player_id in game.players:
+                    del game.players[disconnected_player_id]
+
+                if len(game.players) < 2:
+                    # If less than 2 players are left, end the game
+                    remaining_player_id = 0
+                    if len(game.players) == 1:
+                        remaining_player_id = list(game.players.keys())[0]
+
+                    if remaining_player_id != 0:
                         await self.broadcast_to_game(game_id, {
                             "tipo": "oponente_desconectou",
-                            "vencedor": remaining_player,
+                            "vencedor": remaining_player_id,
                             "mensagem": "Oponente desconectou. Você venceu!"
                         })
                     
-                    del self.games[game_id]
-            
-            del self.connected_clients[websocket]
+                    if game_id in self.games:
+                        del self.games[game_id]
+
 
 async def main():
     server = GameServer()
