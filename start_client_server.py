@@ -22,17 +22,23 @@ def main():
         print(f"Error: Directory '{DIRECTORY}' not found!")
         sys.exit(1)
     
-    # Check if index.html exists
+    # Check if HTML files exist
     index_path = os.path.join(DIRECTORY, "index.html")
-    if not os.path.exists(index_path):
-        print(f"Error: {index_path} not found!")
+    game_path = os.path.join(DIRECTORY, "game.html")
+    
+    if not os.path.exists(index_path) and not os.path.exists(game_path):
+        print(f"Error: No HTML files found in {DIRECTORY}!")
         sys.exit(1)
     
     try:
         with socketserver.TCPServer(("", PORT), Handler) as httpd:
             print(f"Serving HTML client at http://localhost:{PORT}")
             print(f"Serving files from: {os.path.abspath(DIRECTORY)}")
-            print(f"Open your browser and go to: http://localhost:{PORT}")
+            print(f"Available clients:")
+            if os.path.exists(index_path):
+                print(f"  - Simple client: http://localhost:{PORT}/index.html")
+            if os.path.exists(game_path):
+                print(f"  - Visual client: http://localhost:{PORT}/game.html")
             print("Press Ctrl+C to stop the server")
             httpd.serve_forever()
     except KeyboardInterrupt:
