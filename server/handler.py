@@ -64,6 +64,10 @@ def processar_jogada(jogada_json, jogador_id, game_state):
         # Add move to history
         game_state.add_move_to_history(jogador_id, jogada)
         
+        # Switch turns first (before preparing response)
+        if not game_state.is_game_over():
+            game_state.next_turn()
+        
         # Prepare response
         response = {
             "tipo": "atualizacao",
@@ -77,7 +81,8 @@ def processar_jogada(jogada_json, jogador_id, game_state):
                 "angulo": angulo,
                 "forca": forca
             },
-            "mensagem": f"Jogador {jogador_id} causou {dano} de dano! ({impacto_info['tipo']})"
+            "mensagem": f"Jogador {jogador_id} causou {dano} de dano! ({impacto_info['tipo']})",
+            "turno_atual": game_state.turno  # Always include current turn
         }
         
         # Check if game is over
@@ -88,10 +93,6 @@ def processar_jogada(jogada_json, jogador_id, game_state):
                 "vencedor": winner,
                 "mensagem": f"Jogador {winner} venceu! Jogador {adversario} foi eliminado."
             })
-        else:
-            # Switch turns
-            game_state.next_turn()
-            response["turno_atual"] = game_state.turno
         
         logger.info(f"Move processed: Player {jogador_id}, Damage: {dano}, Game Over: {game_state.is_game_over()}")
         

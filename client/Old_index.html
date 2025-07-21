@@ -329,6 +329,7 @@
                     break;
                     
                 case 'inicio':
+                    playerId = data.jogador_id;
                     gameStarted = true;
                     currentTurn = data.turno_atual;
                     document.getElementById('gameControls').classList.add('active');

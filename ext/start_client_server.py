@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-PORT = 8000
+PORT = 8001
 DIRECTORY = "client"
 
 class Handler(http.server.SimpleHTTPRequestHandler):
