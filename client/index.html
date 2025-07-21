@@ -4,212 +4,405 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Batalha de Artilharia para 2 Jogadores</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Poppins:wght@400;600&display=swap"
-        rel="stylesheet">
+    <title>Jogo Multiplayer - Cliente de Teste</title>
     <style>
-        @import "tailwindcss";
-
         body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f0f9ff;
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
         }
-
-        canvas {
-            background-color: #87ceeb;
-            cursor: crosshair;
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-
-        .retro-font {
-            font-family: 'Press Start 2P', cursive;
+        
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
         }
-
-        .player-info {
-            background-color: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(5px);
-            border-radius: 0.5rem;
-            padding: 0.5rem 1rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        
+        .status.waiting {
+            background-color: #fff3cd;
+            color: #856404;
         }
-
-        .hp-bar-container {
-            width: 100%;
-            background-color: #e0e0e0;
-            border-radius: 9999px;
+        
+        .status.playing {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .game-controls {
+            display: none;
+            margin: 20px 0;
+        }
+        
+        .game-controls.active {
+            display: block;
+        }
+        
+        .health-bars {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+        }
+        
+        .health-bar {
+            width: 45%;
+        }
+        
+        .health-bar label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .health-fill {
+            height: 20px;
+            background-color: #28a745;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+        
+        .health-bg {
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
             overflow: hidden;
-            height: 1.25rem;
-            border: 2px solid #a0a0a0;
         }
-
-        .hp-bar {
-            height: 100%;
-            background: linear-gradient(to right, #4ade80, #16a34a);
-            transition: width 0.5s ease-in-out;
-            border-radius: 9999px;
+        
+        .move-controls {
+            margin: 20px 0;
+        }
+        
+        .move-controls label {
+            display: block;
+            margin: 10px 0 5px 0;
+            font-weight: bold;
+        }
+        
+        .move-controls input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .move-controls button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .move-controls button:hover {
+            background-color: #0056b3;
+        }
+        
+        .move-controls button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .messages {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 20px 0;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        
+        .message.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .message.game {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .connection-controls {
+            margin: 20px 0;
+        }
+        
+        .connection-controls input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        
+        .connection-controls button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .connection-controls button:hover {
+            background-color: #218838;
+        }
+        
+        .connection-controls button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
         }
     </style>
 </head>
 
-<body class="bg-blue-50 flex flex-col items-center justify-center min-h-screen p-4">
-
-    <div class="w-full max-w-4xl text-center mb-4 p-4 bg-white rounded-lg shadow-md">
-        <h1 class="text-2xl font-bold text-gray-800 mb-2 retro-font">Batalha de Artilharia</h1>
-        <p id="turnMessage" class="text-lg font-semibold text-blue-700 h-8"></p>
-    </div>
-
-    <div class="relative w-full max-w-4xl">
-        <canvas id="gameCanvas" width="900" height="480"></canvas>
-        <div class="absolute top-4 left-4 w-1/4">
-            <div class="player-info">
-                <h2 class="font-bold text-blue-600 retro-font text-sm">Jogador 1</h2>
-                <div class="hp-bar-container mt-1">
-                    <div id="player1-hp-bar" class="hp-bar"></div>
+<body>
+    <div class="container">
+        <h1>🎮 Jogo Multiplayer - Cliente de Teste</h1>
+        
+        <div class="connection-controls">
+            <input type="text" id="serverUrl" value="ws://localhost:8765" placeholder="URL do servidor">
+            <button id="connectBtn" onclick="connect()">Conectar</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Desconectar</button>
+        </div>
+        
+        <div id="status" class="status waiting">
+            Desconectado
+        </div>
+        
+        <div id="gameControls" class="game-controls">
+            <div class="health-bars">
+                <div class="health-bar">
+                    <label>Jogador 1 (Vida: <span id="health1">100</span>)</label>
+                    <div class="health-bg">
+                        <div id="healthBar1" class="health-fill" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div class="health-bar">
+                    <label>Jogador 2 (Vida: <span id="health2">100</span>)</label>
+                    <div class="health-bg">
+                        <div id="healthBar2" class="health-fill" style="width: 100%"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="absolute top-4 right-4 w-1/4">
-            <div class="player-info text-right">
-                <h2 class="font-bold text-red-600 retro-font text-sm">Jogador 2</h2>
-                <div class="hp-bar-container mt-1">
-                    <div id="player2-hp-bar" class="hp-bar bg-red-500"
-                        style="background: linear-gradient(to left, #f87171, #dc2626);"></div>
-                </div>
+            
+            <div class="move-controls">
+                <label for="angle">Ângulo (0-90 graus):</label>
+                <input type="number" id="angle" min="0" max="90" value="45">
+                
+                <label for="force">Força (0-100):</label>
+                <input type="number" id="force" min="0" max="100" value="75">
+                
+                <button id="moveBtn" onclick="sendMove()" disabled>Fazer Jogada</button>
             </div>
         </div>
+        
+        <div class="messages" id="messages">
+            <div class="message info">Log de mensagens aparecerá aqui...</div>
+        </div>
     </div>
-
-    <button id="resetButton"
-        class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-lg retro-font text-sm">
-        Reiniciar Jogo
-    </button>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const resetButton = document.getElementById('resetButton');
-        const turnMessageEl = document.getElementById('turnMessage');
-        const p1HpBar = document.getElementById('player1-hp-bar');
-        const p2HpBar = document.getElementById('player2-hp-bar');
-
-        let socket;
+        let websocket = null;
+        let connected = false;
         let playerId = null;
-        let gameState = null;
-        let isDragging = false;
-        let dragStart = null;
+        let currentTurn = null;
+        let gameStarted = false;
 
-        function connectToServer() {
-            socket = new WebSocket(`ws://${window.location.hostname}:8765`);
-
-            socket.onopen = () => {
-                console.log("Conectado ao servidor");
-            };
-
-            socket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-
-                if (data.type === "init") {
-                    playerId = data.playerId;
-                    console.log("Você é o jogador", playerId);
-                }
-
-                if (data.type === "state") {
-                    gameState = data.state;
-                    drawGame();
-                }
-            };
-
-            socket.onclose = () => {
-                alert("Conexão perdida com o servidor.");
-            };
+        function addMessage(text, type = 'info') {
+            const messages = document.getElementById('messages');
+            const message = document.createElement('div');
+            message.className = `message ${type}`;
+            message.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            messages.appendChild(message);
+            messages.scrollTop = messages.scrollHeight;
         }
 
-        function sendAction(vx, vy) {
-            if (!socket || socket.readyState !== WebSocket.OPEN) return;
-
-            const action = {
-                type: "action",
-                playerId: playerId,
-                vx: vx,
-                vy: vy
-            };
-            socket.send(JSON.stringify(action));
+        function updateStatus(text, className = 'waiting') {
+            const status = document.getElementById('status');
+            status.textContent = text;
+            status.className = `status ${className}`;
         }
 
-        function drawGame() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        function updateHealth(player1Health, player2Health) {
+            document.getElementById('health1').textContent = player1Health;
+            document.getElementById('health2').textContent = player2Health;
+            document.getElementById('healthBar1').style.width = `${player1Health}%`;
+            document.getElementById('healthBar2').style.width = `${player2Health}%`;
+        }
 
-            // Chão
-            ctx.fillStyle = '#654321';
-            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-            ctx.fillStyle = '#228b22';
-            ctx.fillRect(0, canvas.height - 50, canvas.width, 10);
-
-            if (!gameState) return;
-
-            // Jogadores
-            gameState.players.forEach(p => {
-                ctx.fillStyle = p.color;
-                ctx.fillRect(p.x - p.width / 2, p.y - p.height, p.width, p.height);
-            });
-
-            // Projétil
-            if (gameState.projectile) {
-                const proj = gameState.projectile;
-                ctx.beginPath();
-                ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
-                ctx.fillStyle = proj.color;
-                ctx.fill();
-            }
-
-            // Barras de vida
-            p1HpBar.style.width = `${gameState.players[0].hp}%`;
-            p2HpBar.style.width = `${gameState.players[1].hp}%`;
-
-            // Mensagem de turno
-            if (gameState.winner !== null) {
-                turnMessageEl.textContent = `Jogador ${gameState.winner} venceu!`;
-                turnMessageEl.style.color = 'gold';
-            } else if (gameState.turn === playerId) {
-                turnMessageEl.textContent = "Seu turno!";
-                turnMessageEl.style.color = "#16a34a";
+        function updateMoveButton() {
+            const moveBtn = document.getElementById('moveBtn');
+            const canMove = connected && gameStarted && currentTurn === playerId;
+            moveBtn.disabled = !canMove;
+            
+            if (canMove) {
+                moveBtn.textContent = 'Fazer Jogada - SUA VEZ!';
+                moveBtn.style.backgroundColor = '#28a745';
+            } else if (gameStarted && currentTurn !== playerId) {
+                moveBtn.textContent = 'Aguardando turno do oponente...';
+                moveBtn.style.backgroundColor = '#6c757d';
             } else {
-                turnMessageEl.textContent = "Aguardando oponente...";
-                turnMessageEl.style.color = "#555";
+                moveBtn.textContent = 'Aguardando jogo iniciar...';
+                moveBtn.style.backgroundColor = '#6c757d';
             }
         }
 
-        canvas.addEventListener('mousedown', (e) => {
-            if (!gameState || gameState.turn !== playerId || gameState.winner !== null) return;
-            const rect = canvas.getBoundingClientRect();
-            dragStart = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
+        async function connect() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            
+            try {
+                websocket = new WebSocket(serverUrl);
+                
+                websocket.onopen = function() {
+                    connected = true;
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                    updateStatus('Conectado - Aguardando oponente...', 'waiting');
+                    addMessage('Conectado ao servidor!', 'info');
+                };
+                
+                websocket.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    handleMessage(data);
+                };
+                
+                websocket.onclose = function() {
+                    connected = false;
+                    gameStarted = false;
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    document.getElementById('gameControls').classList.remove('active');
+                    updateStatus('Desconectado', 'waiting');
+                    updateMoveButton();
+                    addMessage('Desconectado do servidor', 'error');
+                };
+                
+                websocket.onerror = function(error) {
+                    addMessage(`Erro de conexão: ${error}`, 'error');
+                    updateStatus('Erro de conexão', 'error');
+                };
+                
+            } catch (error) {
+                addMessage(`Erro ao conectar: ${error}`, 'error');
+                updateStatus('Erro de conexão', 'error');
+            }
+        }
+
+        function disconnect() {
+            if (websocket) {
+                websocket.close();
+            }
+        }
+
+        function handleMessage(data) {
+            addMessage(`Recebido: ${JSON.stringify(data)}`, 'info');
+            
+            switch (data.tipo) {
+                case 'espera':
+                    playerId = data.jogador_id;
+                    updateStatus(`Você é o Jogador ${playerId} - Aguardando oponente...`, 'waiting');
+                    break;
+                    
+                case 'inicio':
+                    gameStarted = true;
+                    currentTurn = data.turno_atual;
+                    document.getElementById('gameControls').classList.add('active');
+                    updateStatus('Jogo iniciado!', 'playing');
+                    updateHealth(data.vidas[1], data.vidas[2]);
+                    updateMoveButton();
+                    addMessage('Jogo iniciado! Boa sorte!', 'game');
+                    break;
+                    
+                case 'atualizacao':
+                    updateHealth(data.vidas[1], data.vidas[2]);
+                    currentTurn = data.turno_atual;
+                    updateMoveButton();
+                    addMessage(data.mensagem, 'game');
+                    
+                    if (data.dano_causado !== undefined) {
+                        addMessage(`Dano causado: ${data.dano_causado} (${data.impacto.tipo})`, 'game');
+                    }
+                    break;
+                    
+                case 'fim_jogo':
+                    gameStarted = false;
+                    updateMoveButton();
+                    updateStatus(`Fim de jogo! Vencedor: Jogador ${data.vencedor}`, 'playing');
+                    addMessage(`🎉 ${data.mensagem}`, 'game');
+                    break;
+                    
+                case 'oponente_desconectou':
+                    gameStarted = false;
+                    updateMoveButton();
+                    updateStatus(`Você venceu! Oponente desconectou.`, 'playing');
+                    addMessage(data.mensagem, 'game');
+                    break;
+                    
+                case 'erro':
+                    addMessage(`❌ Erro: ${data.mensagem}`, 'error');
+                    break;
+                    
+                default:
+                    addMessage(`Tipo de mensagem desconhecido: ${data.tipo}`, 'error');
+            }
+        }
+
+        function sendMove() {
+            if (!connected || !gameStarted || currentTurn !== playerId) {
+                addMessage('Não é possível fazer jogada agora', 'error');
+                return;
+            }
+            
+            const angle = parseInt(document.getElementById('angle').value);
+            const force = parseInt(document.getElementById('force').value);
+            
+            if (angle < 0 || angle > 90) {
+                addMessage('Ângulo deve estar entre 0 e 90 graus', 'error');
+                return;
+            }
+            
+            if (force < 0 || force > 100) {
+                addMessage('Força deve estar entre 0 e 100', 'error');
+                return;
+            }
+            
+            const move = {
+                tipo: 'jogada',
+                angulo: angle,
+                forca: force
             };
-            isDragging = true;
-        });
+            
+            websocket.send(JSON.stringify(move));
+            addMessage(`Jogada enviada: Ângulo=${angle}°, Força=${force}`, 'info');
+        }
 
-        canvas.addEventListener('mouseup', (e) => {
-            if (!isDragging) return;
-            isDragging = false;
-            const rect = canvas.getBoundingClientRect();
-            const endX = e.clientX - rect.left;
-            const endY = e.clientY - rect.top;
-
-            const dx = (endX - dragStart.x) * -0.15;
-            const dy = (endY - dragStart.y) * -0.15;
-
-            sendAction(dx, dy);
-        });
-
-        resetButton.addEventListener('click', () => {
-            socket.send(JSON.stringify({ type: "reset" }));
-        });
-
-        connectToServer();
-
+        // Initialize
+        updateMoveButton();
     </script>
 </body>
 
