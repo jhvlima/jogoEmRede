@@ -1,5 +1,5 @@
-import asyncio
-import websockets
+import socket
+import threading
 import json
 import logging
 from handler import processar_jogada
@@ -10,175 +10,199 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class GameServer:
-    def __init__(self):
-        self.games = {}  # game_id -> game_instance
+    def __init__(self, host='0.0.0.0', port=8765):
+        self.host = host
+        self.port = port
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.games = {}
         self.waiting_players = []
-        self.connected_clients = {}  # websocket -> player_info
-    
-    async def handle_client(self, websocket):
-        try:
-            logger.info(f"New client connected: {websocket.remote_address}")
-            
-            # Add to waiting players or create/join game
-            if len(self.waiting_players) == 0:
-                # First player - create new game
-                game_id = len(self.games) + 1
-                game = EstadoDoJogo(game_id)
-                self.games[game_id] = game
-                
-                player_info = {
-                    'game_id': game_id,
-                    'player_id': 1,
-                    'websocket': websocket
-                }
-                
-                game.add_player(1, websocket)
-                self.connected_clients[websocket] = player_info
-                self.waiting_players.append(player_info)
-                
-                await websocket.send(json.dumps({
-                    "tipo": "espera",
-                    "mensagem": "Aguardando oponente...",
-                    "jogador_id": 1,
-                    "game_id": game_id
-                }))
-                
-            else:
-                # Second player - join existing game
-                waiting_player = self.waiting_players.pop(0)
-                game_id = waiting_player['game_id']
-                game = self.games[game_id]
-                
-                player_info = {
-                    'game_id': game_id,
-                    'player_id': 2,
-                    'websocket': websocket
-                }
-                
-                game.add_player(2, websocket)
-                self.connected_clients[websocket] = player_info
-                
-                # Notify both players that game is starting with their player ID
-                start_message = {
-                    "tipo": "inicio",
-                    "mensagem": "Jogo iniciado! Jogador 1 começa.",
-                    "turno_atual": game.turno,
-                    "vidas": game.vidas
-                }
+        self.connected_clients = {}  # socket -> player_info
+        self.lock = threading.Lock()
 
-                # Send to player 1
-                p1_message = start_message.copy()
-                p1_message['jogador_id'] = 1
-                await game.players[1].send(json.dumps(p1_message))
-                
-                # Send to player 2
-                p2_message = start_message.copy()
-                p2_message['jogador_id'] = 2
-                await game.players[2].send(json.dumps(p2_message))
-            
-            # Listen for messages
-            async for message in websocket:
-                await self.handle_message(websocket, message)
-                
-        except websockets.ConnectionClosed:
-            logger.info(f"Client disconnected: {websocket.remote_address}")
-        except Exception as e:
-            logger.error(f"Error handling client: {e}")
-        finally:
-            await self.cleanup_client(websocket)
-    
-    async def handle_message(self, websocket, message):
+    def send_message(self, client_socket, data):
+        """Encodes and sends a JSON message with a length prefix."""
         try:
-            if websocket not in self.connected_clients:
-                return
-                
-            player_info = self.connected_clients[websocket]
-            game_id = player_info['game_id']
-            player_id = player_info['player_id']
-            
-            if game_id not in self.games:
-                return
-                
-            game = self.games[game_id]
-            
-            # Process the move
-            resposta = processar_jogada(message, player_id, game)
-            
-            # Broadcast response to both players
-            await self.broadcast_to_game(game_id, resposta)
-            
-            # Check for game over
-            if game.is_game_over():
-                winner = game.get_winner()
-                await self.broadcast_to_game(game_id, {
-                    "tipo": "fim_jogo",
-                    "vencedor": winner,
-                    "mensagem": f"Jogador {winner} venceu!"
-                })
-                # Clean up the game
-                if game_id in self.games:
-                    del self.games[game_id]
-                
+            message = json.dumps(data).encode('utf-8')
+            message_length = len(message).to_bytes(4, 'big')
+            client_socket.sendall(message_length + message)
+        except OSError as e:
+            logger.error(f"Error sending message: {e}")
+            self.cleanup_client(client_socket)
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
-            await websocket.send(json.dumps({
-                "tipo": "erro",
-                "mensagem": "Erro interno do servidor"
-            }))
-    
-    async def broadcast_to_game(self, game_id, message):
+            logger.error(f"An unexpected error occurred during send: {e}")
+
+
+    def receive_message(self, client_socket):
+        """Decodes a message with a length prefix."""
+        try:
+            message_length_bytes = client_socket.recv(4)
+            if not message_length_bytes:
+                return None
+            
+            message_length = int.from_bytes(message_length_bytes, 'big')
+            message = client_socket.recv(message_length)
+            return json.loads(message.decode('utf-8'))
+        except (ConnectionResetError, BrokenPipeError):
+             logger.warning("Client disconnected abruptly.")
+             return None
+        except Exception as e:
+            logger.error(f"Error receiving message: {e}")
+            return None
+
+
+    def broadcast_to_game(self, game_id, message):
+        """Broadcasts a message to all players in a game."""
         if game_id not in self.games:
             return
             
         game = self.games[game_id]
-        message_json = json.dumps(message) if isinstance(message, dict) else message
         
-        for player_id, websocket in list(game.players.items()):
-            try:
-                await websocket.send(message_json)
-            except websockets.ConnectionClosed:
-                logger.info(f"Player {player_id} in game {game_id} disconnected")
-    
-    async def cleanup_client(self, websocket):
-        if websocket in self.connected_clients:
-            player_info = self.connected_clients.pop(websocket)
-            game_id = player_info['game_id']
-            
-            # Remove from waiting players if still waiting
-            self.waiting_players = [p for p in self.waiting_players if p['websocket'] != websocket]
-            
-            # Handle game cleanup
-            if game_id in self.games:
+        # Make a copy of player sockets to avoid issues if a player disconnects
+        sockets_to_broadcast = list(game.players.values())
+        
+        for client_socket in sockets_to_broadcast:
+            self.send_message(client_socket, message)
+
+
+    def handle_client(self, client_socket, addr):
+        logger.info(f"New connection from {addr}")
+        
+        player_info = None
+        
+        with self.lock:
+            if not self.waiting_players:
+                # First player starts a new game
+                game_id = len(self.games) + 1
+                game = EstadoDoJogo(game_id)
+                self.games[game_id] = game
+                
+                player_info = {'game_id': game_id, 'player_id': 1, 'socket': client_socket}
+                game.add_player(1, client_socket)
+                self.connected_clients[client_socket] = player_info
+                self.waiting_players.append(player_info)
+                
+                self.send_message(client_socket, {
+                    "tipo": "espera", "mensagem": "Aguardando oponente...",
+                    "jogador_id": 1, "game_id": game_id
+                })
+            else:
+                # Second player joins the waiting game
+                waiting_player_info = self.waiting_players.pop(0)
+                game_id = waiting_player_info['game_id']
                 game = self.games[game_id]
                 
-                # Remove the disconnected player
-                disconnected_player_id = player_info['player_id']
-                if disconnected_player_id in game.players:
-                    del game.players[disconnected_player_id]
+                player_info = {'game_id': game_id, 'player_id': 2, 'socket': client_socket}
+                game.add_player(2, client_socket)
+                self.connected_clients[client_socket] = player_info
+                
+                # Notify both players that the game has started
+                start_message = {
+                    "tipo": "inicio",
+                    "mensagem": "Jogo iniciado! Jogador 1 começa.",
+                    "turno_atual": game.turno, "vidas": game.vidas
+                }
+                
+                # Send personalized message to each player
+                p1_socket = self.games[game_id].players[1]
+                p2_socket = self.games[game_id].players[2]
 
-                if len(game.players) < 2:
-                    # If less than 2 players are left, end the game
-                    remaining_player_id = 0
-                    if len(game.players) == 1:
+                p1_start_message = start_message.copy()
+                p1_start_message['jogador_id'] = 1
+                self.send_message(p1_socket, p1_start_message)
+
+                p2_start_message = start_message.copy()
+                p2_start_message['jogador_id'] = 2
+                self.send_message(p2_socket, p2_start_message)
+
+        try:
+            while True:
+                jogada_json = self.receive_message(client_socket)
+                if jogada_json is None:
+                    break # Client disconnected
+                
+                current_player_info = self.connected_clients.get(client_socket)
+                if not current_player_info:
+                    break
+
+                game = self.games.get(current_player_info['game_id'])
+                if not game:
+                    break
+                
+                # The handler expects a string, so we re-encode it
+                resposta = processar_jogada(json.dumps(jogada_json), current_player_info['player_id'], game)
+                
+                self.broadcast_to_game(current_player_info['game_id'], resposta)
+                
+                if game.is_game_over():
+                    winner = game.get_winner()
+                    self.broadcast_to_game(current_player_info['game_id'], {
+                        "tipo": "fim_jogo", "vencedor": winner, "mensagem": f"Jogador {winner} venceu!"
+                    })
+                    # Game cleanup is handled in the cleanup_client method
+                    break
+
+        except Exception as e:
+            logger.error(f"Error handling client {addr}: {e}")
+        finally:
+            self.cleanup_client(client_socket)
+
+
+    def cleanup_client(self, client_socket):
+        with self.lock:
+            if client_socket in self.connected_clients:
+                player_info = self.connected_clients.pop(client_socket)
+                game_id = player_info.get('game_id')
+                player_id = player_info.get('player_id')
+                
+                logger.info(f"Cleaning up player {player_id} from game {game_id}")
+                
+                # Remove from waiting list if they were there
+                self.waiting_players = [p for p in self.waiting_players if p['socket'] != client_socket]
+                
+                if game_id and game_id in self.games:
+                    game = self.games[game_id]
+                    if player_id in game.players:
+                        del game.players[player_id]
+
+                    # If a player disconnects, the other one wins
+                    if len(game.players) == 1 and game.game_started:
                         remaining_player_id = list(game.players.keys())[0]
-
-                    if remaining_player_id != 0:
-                        await self.broadcast_to_game(game_id, {
+                        self.broadcast_to_game(game_id, {
                             "tipo": "oponente_desconectou",
                             "vencedor": remaining_player_id,
                             "mensagem": "Oponente desconectou. Você venceu!"
                         })
-                    
-                    if game_id in self.games:
-                        del self.games[game_id]
+                        # Clean up the game
+                        if game_id in self.games:
+                             del self.games[game_id]
+                    elif len(game.players) == 0:
+                        # Clean up game if both players left
+                        if game_id in self.games:
+                            del self.games[game_id]
 
+            client_socket.close()
+            logger.info("Client socket closed.")
 
-async def main():
-    server = GameServer()
-    logger.info("Servidor WebSocket iniciando em ws://0.0.0.0:8765")
-    
-    async with websockets.serve(server.handle_client, "0.0.0.0", 8765):
-        await asyncio.Future()  # mantém o servidor rodando para sempre
+    def start(self):
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(5)
+        logger.info(f"Server started on {self.host}:{self.port}")
+        
+        while True:
+            try:
+                client_socket, addr = self.server_socket.accept()
+                thread = threading.Thread(target=self.handle_client, args=(client_socket, addr))
+                thread.daemon = True
+                thread.start()
+            except KeyboardInterrupt:
+                logger.info("Server is shutting down.")
+                break
+            except Exception as e:
+                logger.error(f"Error accepting connections: {e}")
+                break
+        
+        self.server_socket.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    server = GameServer()
+    server.start()

@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #f0f9ff;
+}
+
+canvas {
+    background-color: #87ceeb;
+    cursor: crosshair;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.retro-font {
+    font-family: 'Press Start 2P', cursive;
+}
+
+.player-info {
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(5px);
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.hp-bar-container {
+    width: 100%;
+    background-color: #e0e0e0;
+    border-radius: 9999px;
+    overflow: hidden;
+    height: 1.25rem;
+    border: 2px solid #a0a0a0;
+}
+
+.hp-bar {
+    height: 100%;
+    background: linear-gradient(to right, #4ade80, #16a34a);
+    transition: width 0.5s ease-in-out;
+    border-radius: 9999px;
+}
