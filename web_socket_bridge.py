@@ -63,7 +63,7 @@ async def forward_to_web_client(tcp_reader, websocket):
             logger.error(f"Erro ao encaminhar para o cliente web: {e}")
             break
 
-async def handle_client(websocket, path):
+async def handle_client(websocket):
     """Gerencia a conexão completa: web <-> ponte <-> jogo."""
     logger.info(f"Cliente web conectado de {websocket.remote_address}")
     
@@ -89,7 +89,7 @@ async def handle_client(websocket, path):
     tcp_writer.close()
     await tcp_writer.wait_closed()
     
-    if not websocket.closed:
+    if websocket.state.name != 'CLOSED':
         await websocket.close()
         
     logger.info("Sessão da ponte encerrada.")
