@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batalha de Artilharia para 2 Jogadores</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Poppins:wght@400;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-blue-50 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl text-center mb-4 p-4 bg-white rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold text-gray-800 mb-2 retro-font">Batalha de Artilharia</h1>
+        <p id="turnMessage" class="text-lg font-semibold text-blue-700 h-8"></p>
+    </div>
+
+    <div class="relative w-full max-w-4xl">
+        <canvas id="gameCanvas" width="900" height="480"></canvas>
+        <div class="absolute top-4 left-4 w-1/4">
+            <div class="player-info">
+                <h2 class="font-bold text-blue-600 retro-font text-sm">Jogador 1</h2>
+                <div class="hp-bar-container mt-1">
+                    <div id="player1-hp-bar" class="hp-bar"></div>
+                </div>
+            </div>
+        </div>
+        <div class="absolute top-4 right-4 w-1/4">
+            <div class="player-info text-right">
+                <h2 class="font-bold text-red-600 retro-font text-sm">Jogador 2</h2>
+                <div class="hp-bar-container mt-1">
+                    <div id="player2-hp-bar" class="hp-bar bg-red-500"
+                        style="background: linear-gradient(to left, #f87171, #dc2626);"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="instructions" class="mt-4 text-gray-600">
+        Clique e arraste no canvas para mirar e atirar!
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
