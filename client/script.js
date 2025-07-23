@@ -43,6 +43,12 @@ function handleServerMessage(event) {
             playerId = data.jogador_id;
             currentTurn = data.turno_atual;
             updateUI(data);
+            if (data.impacto && data.impacto.trajetoria) {
+                // Obter a posição inicial do jogador que atirou
+                const shooterId = data.jogada.jogador;
+                const startPos = players[shooterId];
+                animateProjectileFromServer(data.impacto.trajetoria, startPos);
+            }
             break;
         case 'atualizacao':
             currentTurn = data.turno_atual;
@@ -62,6 +68,22 @@ function handleServerMessage(event) {
             break;
     }
 }
+
+function animateProjectileFromServer(trajectoryPath, startPosition) {
+    // A trajetória do servidor é relativa (começa em 0,0). 
+    // Precisamos de a tornar absoluta com base na posição do jogador.
+    const absolutePath = trajectoryPath.map(pos => {
+        // Inverte o eixo X para o jogador 2
+        const direction = (startPosition === players[1]) ? 1 : -1;
+        return {
+            x: startPosition.x + (pos.x * direction),
+            y: startPosition.y - startPosition.height / 2 + pos.y
+        };
+    });
+
+    projectileAnimation = { path: absolutePath, step: 0 };
+}
+
 
 function sendMove(angle, force) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;

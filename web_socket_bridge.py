@@ -28,6 +28,7 @@ async def forward_to_game_server(tcp_writer, websocket):
             # Pega a mensagem do WebSocket e a envia para o servidor TCP com o prefixo de tamanho
             logger.info(f"[Web -> Jogo] Encaminhando: {message}")
             data = message.encode('utf-8')
+            # usando asyncio para evitar bloqueio  
             tcp_writer.write(len(data).to_bytes(4, 'big') + data)
             await tcp_writer.drain()
         except websockets.exceptions.ConnectionClosed:
@@ -94,6 +95,7 @@ async def handle_client(websocket):
 
 async def main():
     logger.info(f"Servidor da ponte WebSocket escutando em ws://localhost:{BRIDGE_WEBSOCKET_PORT}")
+    logger.info(f"Execute o cliente com: python client/client.py")
     server = await websockets.serve(handle_client, "localhost", BRIDGE_WEBSOCKET_PORT)
     await server.wait_closed()
 

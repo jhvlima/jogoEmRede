@@ -20,11 +20,24 @@ class GameServer:
         self.lock = threading.Lock()
 
     def send_message(self, client_socket, data):
-        """Encodes and sends a JSON message with a length prefix."""
+        """" Metodo para codificar e enviar mensagens para o cliente"""
         try:
+            # codifica a mensagem para bytes
             message = json.dumps(data).encode('utf-8')
-            message_length = len(message).to_bytes(4, 'big')
-            client_socket.sendall(message_length + message)
+            message_length = len(message).to_bytes(4, 'big') + message
+
+            # envia o tamanho da mensagem seguido da mensagem com garantia que os byte serao enviados corretamente em um loop
+            total_sent = 0
+            while total_sent < len(message_length):
+                # Tenta enviar a parte restante da mensagem
+                sent = client_socket.send(message_length[total_sent:])
+                
+                # Se 'send' retornar 0, a conexão foi fechada pelo cliente
+                if sent == 0:
+                    raise RuntimeError("Socket connection broken")
+                    
+                total_sent += sent # Atualiza o contador de bytes enviados
+                
         except OSError as e:
             logger.error(f"Error sending message: {e}")
             self.cleanup_client(client_socket)
@@ -33,7 +46,8 @@ class GameServer:
 
 
     def receive_message(self, client_socket):
-        """Decodes a message with a length prefix."""
+        """ Metodo para receber e decodificar mensagens do cliente. 
+        Recebe o tamanho da mensagem primeiro, depois a mensagem em si"""
         try:
             message_length_bytes = client_socket.recv(4)
             if not message_length_bytes:
@@ -51,13 +65,13 @@ class GameServer:
 
 
     def broadcast_to_game(self, game_id, message):
-        """Broadcasts a message to all players in a game."""
+        """Envia uma mensagem para todos os jogadores de um jogo específico."""
         if game_id not in self.games:
             return
             
         game = self.games[game_id]
         
-        # Make a copy of player sockets to avoid issues if a player disconnects
+        # Coleta todos os sockets dos jogadores do jogo
         sockets_to_broadcast = list(game.players.values())
         
         for client_socket in sockets_to_broadcast:
@@ -68,10 +82,11 @@ class GameServer:
         logger.info(f"New connection from {addr}")
         
         player_info = None
-        
+        # lock evita que mais de um jogador modifique o estado do jogo ao mesmo tempo
         with self.lock:
+            
+            # lógica para o jogador 1
             if not self.waiting_players:
-                # First player starts a new game
                 game_id = len(self.games) + 1
                 game = EstadoDoJogo(game_id)
                 self.games[game_id] = game
@@ -85,8 +100,9 @@ class GameServer:
                     "tipo": "espera", "mensagem": "Aguardando oponente...",
                     "jogador_id": 1, "game_id": game_id
                 })
+            
+            # lógica para o jogador 2
             else:
-                # Second player joins the waiting game
                 waiting_player_info = self.waiting_players.pop(0)
                 game_id = waiting_player_info['game_id']
                 game = self.games[game_id]
@@ -95,7 +111,7 @@ class GameServer:
                 game.add_player(2, client_socket)
                 self.connected_clients[client_socket] = player_info
                 
-                # Notify both players that the game has started
+                # mandar mensagem de início do jogo para os dois jogadores
                 start_message = {
                     "tipo": "inicio",
                     "mensagem": "Jogo iniciado! Jogador 1 começa.",
@@ -117,20 +133,22 @@ class GameServer:
         try:
             while True:
                 jogada_json = self.receive_message(client_socket)
+                # cliente desconectou-se
                 if jogada_json is None:
-                    break # Client disconnected
+                    break
                 
+                # verifica se o jogo ainda existe após a ultima jogada
                 current_player_info = self.connected_clients.get(client_socket)
                 if not current_player_info:
                     break
-
                 game = self.games.get(current_player_info['game_id'])
                 if not game:
                     break
                 
-                # The handler expects a string, so we re-encode it
+                # Calcula o oque a jogada faz
                 resposta = processar_jogada(json.dumps(jogada_json), current_player_info['player_id'], game)
                 
+                # Envia a resposta para os dois jogadores
                 self.broadcast_to_game(current_player_info['game_id'], resposta)
                 
                 if game.is_game_over():
@@ -138,7 +156,6 @@ class GameServer:
                     self.broadcast_to_game(current_player_info['game_id'], {
                         "tipo": "fim_jogo", "vencedor": winner, "mensagem": f"Jogador {winner} venceu!"
                     })
-                    # Game cleanup is handled in the cleanup_client method
                     break
 
         except Exception as e:
@@ -148,6 +165,7 @@ class GameServer:
 
 
     def cleanup_client(self, client_socket):
+        """Limpa o estado do cliente desconectado."""
         with self.lock:
             if client_socket in self.connected_clients:
                 player_info = self.connected_clients.pop(client_socket)
@@ -194,6 +212,7 @@ class GameServer:
                 thread = threading.Thread(target=self.handle_client, args=(client_socket, addr))
                 thread.daemon = True
                 thread.start()
+                print(f'Número de threads ativas: {threading.active_count() - 1}')  # Desconta a thread principal
             except KeyboardInterrupt:
                 logger.info("Server is shutting down.")
                 break
