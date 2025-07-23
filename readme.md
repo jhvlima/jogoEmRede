@@ -21,6 +21,10 @@ O dano recebido é proporcional ao local de impacto sendo:
 - CSS: Estilização básica da interface.
 - JavaScript: Lógica do cliente, renderização no Canvas e comunicação com o servidor via API WebSocket nativa do navegador.
 
+### Ponte
+- WebSocket Bridge: Um script Python que atua como uma ponte entre o servidor e o cliente, permitindo a comunicação em tempo real e a troca de mensagens entre eles.
+- TCP/IP: Protocolo de comunicação utilizado para a troca de mensagens entre o servidor e o cliente, garantindo uma conexão confiável e ordenada.
+
 ### Formato de Dados
 - JSON: Utilizado para a serialização de todos os dados trocados entre o servidor e os clientes, garantindo uma comunicação leve e padronizada
 
@@ -28,55 +32,45 @@ O dano recebido é proporcional ao local de impacto sendo:
  - Gerenciar o estado do jogo e a lógica de regras.
  - Sincronização de ações entre jogadores.
  - Sistema de turnos, se aplicável.
- - Incremento (Acesso e Segurança): Implementar login de jogadores e controle de partidas (partidas privadas, convite por token, etc.).
- - Incremento (Mensagens): Suporte a chat entre jogadores, com criptografia ponta a ponta.
 
 # Instruções de Execução
 ### 1. Clone o Repositório
-git clone <URL_DO_SEU_REPOSITORIO>
-cd <NOME_DA_PASTA_DO_PROJETO>
+git clone http://github.com/jhvlima/jogoEmRede.git
+cd jogoEmRede
 
 ### 2. Crie e Ative um Ambiente Virtual (Recomendado)
-# Para Windows
-python3 -m venv venv
-.\venv\Scripts\activate
-# Para macOS/Linux
+``` bash
 python3 -m venv venv
 source venv/bin/activate
+```
 
-### 3. Instale as dependências 
+### 3. Instale as dependências do servidors
 ``` bash
 pip install websockets
+pip install --break-system-packages websockets
 ```
 
 ### 4. Inicie o servidor 
 ``` bash
-python server/server.py
+python3 server/server.py
+```
+ Inicie o servidor WebSocket que gerencia a lógica do jogo e a comunicação entre os jogadores.
+``` bash
+python3 web_socket_bridge.py 
 ```
 
-### 5. Pege o IP do servidor no terminal 
-Servidor iniciado em http://<seu_ip>:8765. Anote o seu endereço de IP na rede local.
+Inicie o servidor HTTP que serve os arquivos estáticos (HTML, CSS, JS) do jogo.
+``` bash
+python3 client.py
+```
 
 ### 6. Conecte os Jogadores
-O terminal mostrará uma mensagem como: Servidor iniciado em http://<seu_ip>:8765. 
-Anote o endereço de IP do seu computador na rede local (ex: 192.168.1.10).
-Jogador 1: Em um navegador, acesse http://<IP_DO_SERVIDOR>:8765.
-Jogador 2: Em outro navegador, acesse o mesmo endereço: http://<IP_DO_SERVIDOR>:8765.
+O terminal mostrará uma mensagem como: Abrindo o jogo em seu navegador padrão: http://localhost:8000/index.html
+Jogador 1: Em um navegador, acesse http://<IP_DO_SERVIDOR>:8000.
+Jogador 2: Em outro navegador, acesse o mesmo endereço: http://<IP_DO_SERVIDOR>:8000.
 O jogo começará automaticamente quando o segundo jogador se conectar.
 
-
-
-Criar um servidor HTTP simples em Python para servir os arquivos estáticos (HTML, JS, CSS)
-Exemplo básico usando o módulo http.server do Python (que já vem instalado):
-
-bash
-Copiar código
-cd pasta_com_o_index_html
-python -m http.server 8000
-
-
 # Como Testar
-
 1. Siga as Instruções de Execução para iniciar o servidor.
 2. Abra o primeiro cliente no navegador. A mensagem "Aguardando oponente..." deve ser exibida.
 3. Abra o segundo cliente. A mensagem deve mudar para "Seu Turno" para o Jogador 1.

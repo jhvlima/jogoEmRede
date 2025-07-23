@@ -37,13 +37,7 @@ def processar_jogada(jogada_json, jogador_id, game_state):
         # Process the move
         angulo = jogada['angulo']
         forca = jogada['forca']
-        
-        # Validate ranges
-        if not (0 <= angulo <= 90):
-            return {
-                "tipo": "erro",
-                "mensagem": "Ângulo deve estar entre 0 e 90 graus."
-            }
+    
         
         if not (0 <= forca <= 100):
             return {
@@ -82,7 +76,7 @@ def processar_jogada(jogada_json, jogador_id, game_state):
                 "forca": forca
             },
             "mensagem": f"Jogador {jogador_id} causou {dano} de dano! ({impacto_info['tipo']})",
-            "turno_atual": game_state.turno  # Always include current turn
+            "turno_atual": game_state.turno
         }
         
         # Check if game is over

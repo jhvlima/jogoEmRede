@@ -1,88 +1,73 @@
-import time
+import asyncio
+import websockets
 import json
-from locust import User, task, between
-from websocket import create_connection, WebSocketException
+import random
+import time
 
-# --- Configurações ---
-BRIDGE_HOST = "ws://localhost:8766"
+# --- Configurações do Teste ---
+NUMERO_DE_CLIENTES = 100  # O número de jogadores simultâneos que quer simular
+URL_DA_PONTE = "ws://localhost:8766"
+TEMPO_ENTRE_JOGADAS = 2 # Segundos que cada cliente espera antes de enviar uma nova jogada
 
-class GameClient:
+async def jogador_virtual(numero_jogador):
     """
-    Um wrapper para o cliente WebSocket que se conecta à ponte.
+    Esta função simula o comportamento completo de um único jogador.
     """
-    def __init__(self, host):
-        try:
-            self.ws = create_connection(host)
-        except WebSocketException as e:
-            raise ConnectionRefusedError(f"Não foi possível conectar a {host}: {e}")
-
-    def receive(self):
-        try:
-            return self.ws.recv()
-        except WebSocketException:
-            return None
-
-    def send(self, data):
-        try:
-            self.ws.send(json.dumps(data))
-        except WebSocketException:
-            pass
+    try:
+        # Conecta-se à ponte, tal como o cliente web faria
+        async with websockets.connect(URL_DA_PONTE) as websocket:
+            print(f"[Jogador {numero_jogador}] Conectado ao servidor.")
             
-    def close(self):
-        self.ws.close()
+            # 1. Espera pelo início do jogo
+            game_started = False
+            my_player_id = 0
+            while not game_started:
+                message_str = await websocket.recv()
+                message = json.loads(message_str)
+                if message.get("tipo") == "inicio":
+                    my_player_id = message.get("jogador_id", 2) # Assume jogador 2 se não tiver ID
+                    game_started = True
+                    print(f"[Jogador {numero_jogador}] Jogo iniciado. Sou o jogador {my_player_id}.")
+                elif message.get("tipo") == "espera":
+                    my_player_id = message.get("jogador_id")
 
-class GameUser(User):
-    """
-    Representa um jogador virtual (um utilizador do Locust).
-    """
-    wait_time = between(2, 5)  # Cada jogador espera entre 2 e 5 segundos entre as jogadas
-
-    def on_start(self):
-        """
-        Chamado quando um jogador virtual é iniciado.
-        Conecta-se à ponte e espera o jogo começar.
-        """
-        try:
-            self.client = GameClient(BRIDGE_HOST)
-            self.player_id = None
-            
-            # Espera a mensagem de 'espera' ou 'inicio'
+            # 2. Loop principal do jogo: envia jogadas periodicamente
             while True:
-                msg_str = self.client.receive()
-                if not msg_str: break
+                # Cria uma jogada aleatória
+                jogada = {
+                    "tipo": "jogada",
+                    "angulo": random.randint(30, 60),
+                    "forca": random.randint(50, 90)
+                }
                 
-                msg = json.loads(msg_str)
-                if msg.get("tipo") == "espera":
-                    self.player_id = msg.get("jogador_id")
-                elif msg.get("tipo") == "inicio":
-                    if not self.player_id: # Se era o jogador 2
-                        self.player_id = 2 
-                    break # O jogo começou, pode ir para as tarefas
-        except Exception:
-            self.environment.runner.quit() # Aborta o teste se a conexão inicial falhar
+                await websocket.send(json.dumps(jogada))
+                print(f"[Jogador {numero_jogador}] Enviou uma jogada.")
+                
+                # Ouve a resposta (não precisa de a processar, apenas confirmar que chega)
+                await websocket.recv()
+                
+                # Espera um pouco antes da próxima jogada
+                await asyncio.sleep(TEMPO_ENTRE_JOGADAS)
 
-    @task
-    def fazer_jogada(self):
-        """
-        A tarefa principal: simula um jogador fazendo uma jogada.
-        """
-        if not self.client:
-            return
-        
-        # Simula uma jogada com ângulo e força aleatórios
-        jogada = {
-            "tipo": "jogada",
-            "angulo": 45,
-            "forca": 75
-        }
-        self.client.send(jogada)
-        
-        # Ouve a resposta para garantir que o ciclo se completa
-        self.client.receive()
+    except websockets.exceptions.ConnectionClosed as e:
+        print(f"[Jogador {numero_jogador}] Desconectado: {e.reason} (Código: {e.code})")
+    except ConnectionRefusedError:
+        print(f"[Jogador {numero_jogador}] ERRO: Não foi possível conectar. A ponte está a ser executada?")
+    except Exception as e:
+        print(f"[Jogador {numero_jogador}] Ocorreu um erro inesperado: {e}")
 
-    def on_stop(self):
-        """
-        Chamado quando um jogador virtual é parado.
-        """
-        if self.client:
-            self.client.close()
+
+async def main():
+    print("--- INICIANDO TESTE DE CAPACIDADE ---")
+    print(f"A simular {NUMERO_DE_CLIENTES} clientes a conectarem-se a {URL_DA_PONTE}")
+    print("Certifique-se de que o 'server.py' e o 'web_socket_bridge.py' estão a ser executados.")
+    
+    # Cria e inicia todas as tarefas dos jogadores virtuais
+    tarefas = [jogador_virtual(i) for i in range(1, NUMERO_DE_CLIENTES + 1)]
+    await asyncio.gather(*tarefas)
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nTeste de capacidade interrompido.")
