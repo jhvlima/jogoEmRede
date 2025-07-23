@@ -1,5 +1,3 @@
-# web_socket_bridge.py
-
 import asyncio
 import websockets
 import socket

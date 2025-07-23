@@ -1,106 +1,51 @@
-# web_socket_bridge.py
+import http.server
+import socketserver
+import webbrowser
+import os
+import sys
 
-import asyncio
-import websockets
-import socket
-import json
-import logging
+PORT = 8000
+DIRECTORY = "client"
+# O nome do ficheiro HTML principal que deve ser aberto
+HTML_FILE = "index.html" 
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# URL completa para abrir no navegador
+URL = f"http://localhost:{PORT}/{HTML_FILE}"
 
-GAME_SERVER_HOST = 'localhost'
-GAME_SERVER_PORT = 8765
-BRIDGE_WEBSOCKET_PORT = 8766
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=DIRECTORY, **kwargs)
 
-async def connect_to_game_server():
-    """Tenta se conectar ao servidor de jogo TCP."""
+def main():
+    # Verifica se o diretório do cliente existe
+    if not os.path.exists(DIRECTORY):
+        print(f"Erro: Diretório '{DIRECTORY}' não encontrado!")
+        sys.exit(1)
+    
+    # Verifica se o ficheiro HTML principal existe
+    file_path = os.path.join(DIRECTORY, HTML_FILE)
+    if not os.path.exists(file_path):
+        print(f"Erro: Ficheiro principal '{file_path}' não encontrado!")
+        sys.exit(1)
+    
     try:
-        reader, writer = await asyncio.open_connection(GAME_SERVER_HOST, GAME_SERVER_PORT)
-        logger.info(f"Ponte conectada ao servidor de jogo em {GAME_SERVER_HOST}:{GAME_SERVER_PORT}")
-        return reader, writer
-    except ConnectionRefusedError:
-        logger.error("Falha ao conectar ao servidor de jogo. Ele está rodando?")
-        return None, None
-
-async def forward_to_game_server(tcp_writer, websocket):
-    """Encaminha mensagens do cliente web (WebSocket) para o servidor de jogo (TCP)."""
-    async for message in websocket:
-        try:
-            # Pega a mensagem do WebSocket e a envia para o servidor TCP com o prefixo de tamanho
-            logger.info(f"[Web -> Jogo] Encaminhando: {message}")
-            data = message.encode('utf-8')
-            tcp_writer.write(len(data).to_bytes(4, 'big') + data)
-            await tcp_writer.drain()
-        except websockets.exceptions.ConnectionClosed:
-            logger.info("Cliente web desconectado.")
-            break
-        except Exception as e:
-            logger.error(f"Erro ao encaminhar para o servidor de jogo: {e}")
-            break
-
-async def forward_to_web_client(tcp_reader, websocket):
-    """Encaminha mensagens do servidor de jogo (TCP) para o cliente web (WebSocket)."""
-    while True:
-        try:
-            # Lê o prefixo de tamanho da mensagem TCP
-            header = await tcp_reader.readexactly(4)
-            if not header:
-                break
+        with socketserver.TCPServer(("", PORT), Handler) as httpd:
+            print(f"Servidor HTTP iniciado em http://localhost:{PORT}")
             
-            message_length = int.from_bytes(header, 'big')
-            # Lê o corpo da mensagem
-            data = await tcp_reader.readexactly(message_length)
-            message = data.decode('utf-8')
+            try:
+                print(f"Abrindo o jogo em seu navegador padrão: {URL}")
+                webbrowser.open_new_tab(URL)
+            except webbrowser.Error:
+                print(f"Não foi possível abrir o navegador automaticamente. Por favor, acesse manualmente: {URL}")
             
-            # Envia a mensagem para o cliente web via WebSocket
-            logger.info(f"[Jogo -> Web] Encaminhando: {message}")
-            await websocket.send(message)
-        except (asyncio.IncompleteReadError, websockets.exceptions.ConnectionClosed):
-            logger.info("Conexão encerrada (servidor de jogo ou cliente web).")
-            break
-        except Exception as e:
-            logger.error(f"Erro ao encaminhar para o cliente web: {e}")
-            break
-
-async def handle_client(websocket, path):
-    """Gerencia a conexão completa: web <-> ponte <-> jogo."""
-    logger.info(f"Cliente web conectado de {websocket.remote_address}")
-    
-    tcp_reader, tcp_writer = await connect_to_game_server()
-    if not tcp_writer:
-        await websocket.close(1011, "Servidor de jogo indisponível.")
-        return
-
-    # Executa as duas tarefas de encaminhamento concorrentemente
-    task_web_to_game = asyncio.create_task(forward_to_game_server(tcp_writer, websocket))
-    task_game_to_web = asyncio.create_task(forward_to_web_client(tcp_reader, websocket))
-
-    # Aguarda a primeira tarefa a ser concluída (o que indica uma desconexão)
-    done, pending = await asyncio.wait(
-        [task_web_to_game, task_game_to_web],
-        return_when=asyncio.FIRST_COMPLETED
-    )
-
-    # Cancela as tarefas pendentes e fecha as conexões
-    for task in pending:
-        task.cancel()
-    
-    tcp_writer.close()
-    await tcp_writer.wait_closed()
-    
-    if not websocket.closed:
-        await websocket.close()
-        
-    logger.info("Sessão da ponte encerrada.")
-
-async def main():
-    logger.info(f"Servidor da ponte WebSocket escutando em ws://localhost:{BRIDGE_WEBSOCKET_PORT}")
-    server = await websockets.serve(handle_client, "localhost", BRIDGE_WEBSOCKET_PORT)
-    await server.wait_closed()
+            print("Pressione Ctrl+C para parar o servidor.")
+            httpd.serve_forever()
+            
+    except KeyboardInterrupt:
+        print("\nServidor parado.")
+    except Exception as e:
+        print(f"Erro ao iniciar o servidor: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Ponte encerrada pelo usuário.")
+    main()
